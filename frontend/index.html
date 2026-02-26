@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Three-Tier App</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+    header { background: linear-gradient(135deg, #1e40af, #7c3aed); padding: 24px 40px; display: flex; align-items: center; gap: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+    header h1 { font-size: 1.8rem; font-weight: 700; }
+    .badge { background: rgba(255,255,255,0.15); padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; backdrop-filter: blur(4px); }
+    .container { max-width: 900px; margin: 40px auto; padding: 0 20px; }
+    .status-bar { display: flex; gap: 12px; margin-bottom: 32px; flex-wrap: wrap; }
+    .status-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 16px 24px; flex: 1; min-width: 140px; text-align: center; }
+    .status-card .label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
+    .status-card .value { font-size: 1.5rem; font-weight: 700; margin-top: 4px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+    .dot.green { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
+    .dot.red { background: #ef4444; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 28px; margin-bottom: 24px; }
+    .card h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 20px; color: #cbd5e1; }
+    .form-row { display: flex; gap: 12px; flex-wrap: wrap; }
+    input, textarea { background: #0f172a; border: 1px solid #475569; border-radius: 8px; padding: 12px 16px; color: #e2e8f0; font-size: 0.95rem; outline: none; transition: border-color 0.2s; }
+    input:focus, textarea:focus { border-color: #6366f1; }
+    input[name="name"] { flex: 1; min-width: 200px; }
+    textarea { flex: 2; min-width: 250px; resize: none; height: 46px; }
+    button { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; border: none; border-radius: 8px; padding: 12px 24px; cursor: pointer; font-size: 0.95rem; font-weight: 600; transition: opacity 0.2s, transform 0.1s; white-space: nowrap; }
+    button:hover { opacity: 0.9; transform: translateY(-1px); }
+    button:active { transform: translateY(0); }
+    .item-list { display: flex; flex-direction: column; gap: 12px; }
+    .item { background: #0f172a; border: 1px solid #1e293b; border-radius: 10px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; transition: border-color 0.2s; animation: fadeIn 0.3s ease; }
+    .item:hover { border-color: #475569; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+    .item-info .name { font-weight: 600; color: #f1f5f9; }
+    .item-info .desc { font-size: 0.85rem; color: #64748b; margin-top: 2px; }
+    .item-info .date { font-size: 0.75rem; color: #475569; margin-top: 4px; }
+    .del-btn { background: transparent; border: 1px solid #ef4444; color: #ef4444; padding: 6px 14px; font-size: 0.8rem; border-radius: 6px; }
+    .del-btn:hover { background: #ef4444; color: white; }
+    .empty { text-align: center; padding: 40px; color: #475569; }
+    .toast { position: fixed; bottom: 24px; right: 24px; background: #22c55e; color: white; padding: 12px 20px; border-radius: 10px; font-weight: 600; opacity: 0; transform: translateY(10px); transition: all 0.3s; pointer-events: none; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.error { background: #ef4444; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>🚀 Three-Tier App Capstone-Project</h1>
+      <p style="font-size:0.85rem;opacity:0.75;margin-top:2px;">Docker · GitHub Actions · PostgreSQL</p>
+    </div>
+    <span class="badge">v1.0.0</span>
+  </header>
+
+  <div class="container">
+    <div class="status-bar">
+      <div class="status-card">
+        <div class="label">Frontend</div>
+        <div class="value" style="color:#22c55e"><span class="dot green"></span>Nginx</div>
+      </div>
+      <div class="status-card">
+        <div class="label">Backend</div>
+        <div class="value" id="beStatus" style="color:#94a3b8">Checking…</div>
+      </div>
+      <div class="status-card">
+        <div class="label">Database</div>
+        <div class="value" id="dbStatus" style="color:#94a3b8">—</div>
+      </div>
+      <div class="status-card">
+        <div class="label">Items</div>
+        <div class="value" id="itemCount">—</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>➕ Add New Item</h2>
+      <div class="form-row">
+        <input name="name" placeholder="Item name" id="itemName" />
+        <textarea placeholder="Description (optional)" id="itemDesc"></textarea>
+        <button onclick="addItem()">Add Item</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>📦 Items</h2>
+      <div class="item-list" id="itemList"><div class="empty">Loading…</div></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const API = '/api';
+
+    async function checkHealth() {
+      try {
+        const r = await fetch(`${API}/health`);  // proxied through nginx
+        if (r.ok) {
+          document.getElementById('beStatus').innerHTML = '<span class="dot green"></span>Node.js';
+          document.getElementById('beStatus').style.color = '#22c55e';
+          document.getElementById('dbStatus').innerHTML = '<span class="dot green"></span>Postgres';
+          document.getElementById('dbStatus').style.color = '#22c55e';
+        }
+      } catch { 
+        document.getElementById('beStatus').innerHTML = '<span class="dot red"></span>Offline';
+        document.getElementById('beStatus').style.color = '#ef4444';
+      }
+    }
+
+    async function fetchItems() {
+      try {
+        const r = await fetch(`${API}/items`);
+        const items = await r.json();
+        document.getElementById('itemCount').textContent = items.length;
+        const list = document.getElementById('itemList');
+        if (!items.length) { list.innerHTML = '<div class="empty">No items yet. Add one above!</div>'; return; }
+        list.innerHTML = items.map(i => `
+          <div class="item" id="item-${i.id}">
+            <div class="item-info">
+              <div class="name">${i.name}</div>
+              ${i.description ? `<div class="desc">${i.description}</div>` : ''}
+              <div class="date" style="font-size:0.75rem;color:#475569;margin-top:4px">${new Date(i.created_at).toLocaleString()}</div>
+            </div>
+            <button class="del-btn" onclick="deleteItem(${i.id})">Delete</button>
+          </div>`).join('');
+      } catch(e) { document.getElementById('itemList').innerHTML = '<div class="empty">Failed to load items.</div>'; }
+    }
+
+    async function addItem() {
+      const name = document.getElementById('itemName').value.trim();
+      const description = document.getElementById('itemDesc').value.trim();
+      if (!name) { showToast('Name is required', true); return; }
+      try {
+        await fetch(`${API}/items`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name, description}) });
+        document.getElementById('itemName').value = '';
+        document.getElementById('itemDesc').value = '';
+        showToast('Item added!');
+        fetchItems();
+      } catch { showToast('Failed to add item', true); }
+    }
+
+    async function deleteItem(id) {
+      try {
+        await fetch(`${API}/items/${id}`, { method: 'DELETE' });
+        showToast('Item deleted');
+        fetchItems();
+      } catch { showToast('Failed to delete', true); }
+    }
+
+    function showToast(msg, err=false) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast show' + (err ? ' error' : '');
+      setTimeout(() => t.className = 'toast', 3000);
+    }
+
+    checkHealth();
+    fetchItems();
+    setInterval(checkHealth, 30000);
+  </script>
+</body>
+</html>

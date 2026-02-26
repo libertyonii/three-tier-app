@@ -1,0 +1,30 @@
+# ── Stage 1: Build (nothing to compile for static HTML, but shows pattern) ────
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+COPY . .
+# If you had a build step (React/Vue), it would run here:
+# RUN npm ci && npm run build
+
+# ── Stage 2: Production with Nginx ───────────────────────────────────────────
+FROM nginx:1.25-alpine AS production
+
+LABEL maintainer="your-team@example.com"
+LABEL version="1.0.0"
+LABEL description="Three-Tier App – Frontend (Nginx)"
+
+# Remove default Nginx content
+RUN rm -rf /usr/share/nginx/html/*
+
+# Copy static assets from builder
+COPY --from=builder /app/index.html /usr/share/nginx/html/
+
+# Copy custom Nginx config (api proxy + gzip + security headers)
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -qO- http://localhost/health || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]
