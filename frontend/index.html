@@ -94,7 +94,7 @@
 
     async function checkHealth() {
       try {
-        const r = await fetch(`${API}/health`);  // proxied through nginx
+        const r = await fetch(`/health`);  // proxied through nginx
         if (r.ok) {
           document.getElementById('beStatus').innerHTML = '<span class="dot green"></span>Node.js';
           document.getElementById('beStatus').style.color = '#22c55e';
