@@ -142,4 +142,4 @@ GitHub Actions handles the rest automatically.
 
 ## Author
 
-Built as a capstone project demonstrating Docker containerisation, CI/CD automation, and cloud deployment on Azure.
+Built as a capstone project for Techcruch, demonstrating Docker containerisation, CI/CD automation, and cloud deployment on Azure.
