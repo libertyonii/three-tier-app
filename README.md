@@ -84,8 +84,6 @@ Copy `.env.example` to `.env` and fill in these values:
 | `DB_USER` | PostgreSQL username |
 | `DB_PASSWORD` | PostgreSQL password |
 
-> Never commit your `.env` file — it is listed in `.gitignore`.
-
 ---
 
 ## CI/CD Pipeline
@@ -126,8 +124,8 @@ Every push to `main` automatically:
 
 **1. Provision the VM (once)**
 ```bash
-scp vm-setup.sh azureuser@YOUR_VM_IP:~/
-ssh azureuser@YOUR_VM_IP
+scp vm-setup.sh vm_name@YOUR_VM_IP:~/
+ssh vm_name@YOUR_VM_IP
 chmod +x vm-setup.sh && ./vm-setup.sh
 ```
 
