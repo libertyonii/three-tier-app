@@ -11,18 +11,79 @@ A containerised three-tier web application built with Node.js, PostgreSQL, and N
 
 ---
 
-## Architecture
+## What Is This?
+
+This is a full-stack web application built and deployed using modern DevOps practices. It runs three independent services — a frontend, a backend, and a database — each inside its own Docker container, orchestrated together using Docker Compose and deployed to a live cloud server on Microsoft Azure.
+
+It was built as a Capstone Project for Techcrush to demonstrate real-world skills in containerisation, cloud deployment, and CI/CD automation.
+
+---
+
+## What It Does
+
+The application lets users create, view, and delete items through a browser interface. When a user adds an item, it is sent to the backend API which saves it to the PostgreSQL database. The item then appears in the list immediately. Users can delete any item and the change is reflected instantly.
+
+The dashboard also shows the live health status of all three tiers — Frontend, Backend, and Database — updating every 30 seconds automatically.
+
+Key features:
+- Add, view and delete items through the browser
+- Real-time health status dashboard for all three tiers
+- Data persists across container restarts using Docker volumes
+- Accessible from anywhere via a public IP address on Azure
+
+---
+
+## Why I Built It This Way
+
+Each tier is kept completely separate and independent for three reasons:
+
+**Security** — The database is on a private internal network. It cannot be reached from the internet at all — only the backend can talk to it. The frontend only ever talks to the backend through Nginx.
+
+**Scalability** — Because each tier is its own container, you can scale any one of them independently without touching the others. If traffic increases you can run multiple backend containers without changing the frontend or database.
+
+**Maintainability** — You can update, restart, or redeploy any single tier without taking down the whole application. If the frontend needs a change, the backend and database keep running untouched.
+
+Multi-stage Dockerfiles were used for both the frontend and backend to keep the final images as small and secure as possible. Only what is needed to run the app makes it into the production image — no build tools, no dev dependencies, no unnecessary files.
+
+---
+
+## The Architecture
 
 ```
-Internet → Port 80 → [Nginx Frontend] → [Node.js Backend] → [PostgreSQL DB]
-                       (public)           (internal only)     (private network)
+Internet
+    │
+    ▼
+┌─────────────────────┐
+│   Nginx Frontend    │  ← Port 80 (public facing)
+│   Serves HTML/JS    │
+│   Proxies /api/*    │
+└──────────┬──────────┘
+           │ internal network only
+           ▼
+┌─────────────────────┐
+│   Node.js Backend   │  ← Port 5000 (never exposed publicly)
+│   Express REST API  │
+└──────────┬──────────┘
+           │ private network only
+           ▼
+┌─────────────────────┐
+│   PostgreSQL 16     │  ← Port 5432 (completely hidden)
+│   Persistent Volume │
+└─────────────────────┘
 ```
 
-| Tier | Technology | Purpose |
-|------|-----------|---------|
-| Frontend | Nginx + HTML/JS | Serves UI, proxies API requests |
-| Backend | Node.js + Express | REST API, business logic |
-| Database | PostgreSQL 16 | Persistent data storage |
+| Tier | Technology | Access |
+|------|-----------|--------|
+| Frontend | Nginx 1.25 + HTML/JS | Public — port 80 |
+| Backend | Node.js 20 + Express | Internal only — port 5000 |
+| Database | PostgreSQL 16 Alpine | Private network only |
+
+Two separate Docker networks enforce the isolation:
+
+| Network | Type | Members |
+|---------|------|---------|
+| app-frontend-net | bridge | frontend, backend |
+| app-backend-net | bridge (internal) | backend, db |
 
 ---
 
@@ -31,69 +92,94 @@ Internet → Port 80 → [Nginx Frontend] → [Node.js Backend] → [PostgreSQL 
 ```
 three-tier-app/
 ├── backend/
-│   ├── Dockerfile
+│   ├── Dockerfile          # Multi-stage Node.js build
+│   ├── .dockerignore
 │   ├── package.json
-│   └── server.js
+│   └── server.js           # Express REST API
 ├── frontend/
-│   ├── Dockerfile
-│   ├── nginx.conf
-│   └── index.html
-├── .github/workflows/
-│   └── ci-cd.yml
-├── docker-compose.yml
-├── vm-setup.sh
-└── .env.example
+│   ├── Dockerfile          # Multi-stage Nginx build
+│   ├── .dockerignore
+│   ├── nginx.conf          # Reverse proxy + security headers
+│   └── index.html          # Single-page application
+├── .github/
+│   └── workflows/
+│       └── ci-cd.yml       # GitHub Actions pipeline
+├── docker-compose.yml      # Orchestrates all 3 services
+├── vm-setup.sh             # One-time VM provisioning script
+├── .env.example            # Environment variable template
+├── .gitignore
+└── README.md
 ```
 
 ---
 
-## Running Locally
+## How the Deployment Works
 
+The application runs on an Ubuntu 22.04 LTS virtual machine on Microsoft Azure. The VM was provisioned using `vm-setup.sh` which installs Docker, configures the UFW firewall, and sets up the application directory automatically.
+
+**Firewall rules on the VM:**
+
+| Port | Purpose |
+|------|---------|
+| 22 | SSH access |
+| 80 | HTTP web traffic |
+| 443 | HTTPS web traffic |
+
+Ports 5000 (backend) and 5432 (database) are never opened to the outside world.
+
+**To run locally:**
 ```bash
-# Clone the repo
 git clone https://github.com/libertyonii/three-tier-app.git
 cd three-tier-app
-
-# Generate package-lock.json
 cd backend && npm install && cd ..
-
-# Set up environment
-cp .env.example .env        # then fill in your values
-
-# Start all services
+cp .env.example .env        # fill in your values
 docker compose up --build
-
-# Open in browser
-http://localhost
-
-# Stop
-docker compose down
 ```
 
----
+Then open `http://localhost` in your browser.
 
-## Environment Variables
-
-Copy `.env.example` to `.env` and fill in these values:
+**Environment Variables:**
 
 | Variable | Description |
 |----------|-------------|
 | `DOCKER_USERNAME` | Your Docker Hub username |
-| `IMAGE_TAG` | Image tag to use (default: latest) |
+| `IMAGE_TAG` | Image tag to use |
 | `DB_NAME` | PostgreSQL database name |
 | `DB_USER` | PostgreSQL username |
 | `DB_PASSWORD` | PostgreSQL password |
 
+> Never commit your `.env` file — it is listed in `.gitignore`.
+
 ---
 
-## CI/CD Pipeline
+## CI/CD with GitHub Actions
 
-Every push to `main` automatically:
-1. Builds backend and frontend Docker images
-2. Pushes them to Docker Hub with a versioned tag
-3. SSHs into the Azure VM and redeploys the containers
+Every push to `main` triggers the pipeline automatically. No manual steps are needed after the initial setup.
 
-### Required GitHub Secrets
+**What happens on every push:**
+
+```
+git push origin main
+        │
+        ▼
+  GitHub Actions
+        │
+        ├── 1. Checkout code
+        ├── 2. Login to Docker Hub
+        ├── 3. Build backend image
+        ├── 4. Build frontend image
+        ├── 5. Push both images to Docker Hub
+        │
+        └── 6. SSH into Azure VM
+                ├── Write .env with secrets
+                ├── docker compose pull
+                ├── docker compose up -d
+                └── docker image prune
+```
+
+Images are tagged with the git commit SHA for full traceability and rollback capability. Every image pushed can be traced back to the exact commit that built it.
+
+**Required GitHub Secrets:**
 
 | Secret | Description |
 |--------|-------------|
@@ -107,6 +193,12 @@ Every push to `main` automatically:
 | `DB_USER` | Database username |
 | `DB_PASSWORD` | Database password |
 
+**To release a versioned tag:**
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
 ---
 
 ## API Reference
@@ -118,28 +210,49 @@ Every push to `main` automatically:
 | POST | `/api/items` | Create an item |
 | DELETE | `/api/items/:id` | Delete an item |
 
+**Example:**
+```bash
+curl -X POST http://YOUR_VM_IP/api/items \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"My Item","description":"A test item"}'
+```
+
 ---
 
-## Deployment
+## Challenges I Ran Into
 
-**1. Provision the VM (once)**
-```bash
-scp vm-setup.sh vm_name@YOUR_VM_IP:~/
-ssh vm_name@YOUR_VM_IP
-chmod +x vm-setup.sh && ./vm-setup.sh
-```
+**1. Docker health check typo**
+The frontend container was marked unhealthy for a long time due to a single character typo in the Dockerfile — `-q0-` (zero) instead of `-qO-` (capital O) in the wget flag. This caused the health check to always fail silently. The fix was found by running `docker inspect` to read the exact command Docker was executing.
 
-**2. Deploy by pushing to main**
-```bash
-git add .
-git commit -m "your message"
-git push origin main
-```
+**2. Azure VM dynamic IP**
+Azure assigns a new public IP every time the VM is stopped and restarted unless a static IP is configured. This caused SSH connections and the GitHub Actions deployment to fail after every restart. Fixed by setting the IP assignment to Static in the Azure portal.
 
-GitHub Actions handles the rest automatically.
+**3. Wrong directory on the VM**
+Running `docker compose` commands from the home directory instead of the `three-tier-app` folder caused it to pick up a stray `docker-compose.yml` file in the wrong location. Fixed by always running `cd ~/three-tier-app` first and adding it to `.bashrc` so it loads automatically on every SSH login.
+
+**4. SCP action failing in GitHub Actions**
+The `appleboy/scp-action` step was failing to copy `docker-compose.yml` to the VM. Resolved by removing the separate SCP step entirely and writing the compose file content directly on the VM through the SSH session itself.
+
+**5. Missing package-lock.json**
+The backend Dockerfile uses `npm ci` which requires `package-lock.json` to exist. The file was not committed to the repository, causing the Docker build to fail with exit code 1. Fixed by running `npm install` locally to generate the file before building.
+
+---
+
+## Does It Meet the Brief?
+
+| Requirement | Status |
+|-------------|--------|
+| Dockerfile for backend | ✅ Multi-stage Node.js Dockerfile |
+| Dockerfile for frontend | ✅ Multi-stage Nginx Dockerfile |
+| Containerise both with Docker | ✅ Separate containers with health checks |
+| docker-compose.yml for all three services | ✅ Frontend, backend, and database orchestrated |
+| Push images to Docker Hub with tagged versions | ✅ SHA tags and latest pushed on every pipeline run |
+| Create a Linux VM and deploy containers | ✅ Azure Ubuntu 22.04 VM with public IP |
+| Expose app for external consumption | ✅ Accessible at http://102.37.153.124 |
+| Integrate build and deployment with GitHub | ✅ Full CI/CD pipeline via GitHub Actions |
 
 ---
 
 ## Author
 
-Built as a capstone project for Techcruch, demonstrating Docker containerisation, CI/CD automation, and cloud deployment on Azure.
+Built as a capstone project demonstrating Docker containerisation, CI/CD automation, and cloud deployment on Azure.
