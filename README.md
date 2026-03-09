@@ -222,7 +222,7 @@ curl -X POST http://YOUR_VM_IP/api/items \
 ## Challenges I Ran Into
 
 **1. Docker health check typo**
-The frontend container was marked unhealthy for a long time due to a single character typo in the Dockerfile — `-q0-` (zero) instead of `-qO-` (capital O) in the wget flag. This caused the health check to always fail silently. The fix was found by running `docker inspect` to read the exact command Docker was executing.
+The frontend container was marked unhealthy for a long time due to a single character typo in the Dockerfile — `-q0-` (zero) instead of `-qO-` in the wget flag. This caused the health check to always fail silently. The fix was found by running `docker inspect` to read the exact command Docker was executing.
 
 **2. Azure VM dynamic IP**
 Azure assigns a new public IP every time the VM is stopped and restarted unless a static IP is configured. This caused SSH connections and the GitHub Actions deployment to fail after every restart. Fixed by setting the IP assignment to Static in the Azure portal.
